@@ -1,11 +1,11 @@
 import os
 import json
 import subprocess
+import requests
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-import yt_dlp
 from groq import Groq
 
 app = FastAPI()
@@ -41,29 +41,37 @@ async def generate_clips(req: VideoRequest):
             if os.path.exists(f):
                 os.remove(f)
 
-        # 1. Advanced yt-dlp config with multiple fallback player clients and spoofing
-        ydl_opts = {
-            'format': 'best[height<=720][ext=mp4]/best[ext=mp4]',
-            'outtmpl': video_path,
-            'overwrites': True,
-            'noplaylist': True,
-            'geo_bypass': True,
-            'extractor_args': {
-                'youtube': {
-                    'player-client': ['ios', 'android', 'web']
-                }
-            },
-            'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
-            }
+        # 1. Fetch direct download link using Cobalt API (Bypasses YouTube bot block completely)
+        cobalt_url = "https://api.cobalt.tools/api/json"
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
         }
-        
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([req.url])
+        payload = {
+            "url": req.url,
+            "videoQuality": "720"
+        }
 
-        # 2. Audio extract
+        res = requests.post(cobalt_url, json=payload, headers=headers)
+        res_data = res.json()
+
+        download_url = None
+        if "url" in res_data:
+            download_url = res_data["url"]
+        elif "picker" in res_data and len(res_data["picker"]) > 0:
+            download_url = res_data["picker"][0]["url"]
+
+        if not download_url:
+            raise HTTPException(status_code=400, detail="Could not extract video stream from URL.")
+
+        # Download video file using the direct stream link
+        vid_res = requests.get(download_url, stream=True)
+        with open(video_path, "wb") as f:
+            for chunk in vid_res.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+
+        # 2. Audio extract via FFmpeg
         subprocess.run([
             "ffmpeg", "-y", "-i", video_path, "-vn", 
             "-acodec", "libmp3lame", "-q:a", "4", audio_path

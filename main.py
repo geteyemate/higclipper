@@ -1,11 +1,11 @@
 import os
 import json
 import subprocess
-import requests
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+import yt_dlp
 from groq import Groq
 
 app = FastAPI()
@@ -41,35 +41,24 @@ async def generate_clips(req: VideoRequest):
             if os.path.exists(f):
                 os.remove(f)
 
-        # 1. Fetch direct download link using Cobalt API (Bypasses YouTube bot block completely)
-        cobalt_url = "https://api.cobalt.tools/api/json"
-        headers = {
-            "Accept": "application/json",
-            "Content-Type": "application/json"
+        # 1. Direct yt-dlp download with universal options
+        ydl_opts = {
+            'format': 'mp4/best',
+            'outtmpl': video_path,
+            'overwrites': True,
+            'noplaylist': True,
+            'extractor_args': {'youtube': {'player-client': ['android']}},
+            'socket_timeout': 30
         }
-        payload = {
-            "url": req.url,
-            "videoQuality": "720"
-        }
 
-        res = requests.post(cobalt_url, json=payload, headers=headers)
-        res_data = res.json()
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([req.url])
+        except Exception as yt_err:
+            raise HTTPException(status_code=400, detail=f"Download failed: {str(yt_err)}")
 
-        download_url = None
-        if "url" in res_data:
-            download_url = res_data["url"]
-        elif "picker" in res_data and len(res_data["picker"]) > 0:
-            download_url = res_data["picker"][0]["url"]
-
-        if not download_url:
-            raise HTTPException(status_code=400, detail="Could not extract video stream from URL.")
-
-        # Download video file using the direct stream link
-        vid_res = requests.get(download_url, stream=True)
-        with open(video_path, "wb") as f:
-            for chunk in vid_res.iter_content(chunk_size=8192):
-                if chunk:
-                    f.write(chunk)
+        if not os.path.exists(video_path) or os.path.getsize(video_path) == 0:
+            raise HTTPException(status_code=400, detail="Downloaded video file is empty or missing.")
 
         # 2. Audio extract via FFmpeg
         subprocess.run([
@@ -91,7 +80,7 @@ async def generate_clips(req: VideoRequest):
         # 4. Groq Llama-3 se Viral Moments
         prompt = f"""
         Analyze this video transcript with timestamps and find the top 3 most engaging, viral-worthy clips (each 20 to 50 seconds long).
-        Return ONLY a valid JSON array with objects containing: "title", "start" (number in seconds), "end" (number in seconds), and "viral_score" (1-100).
+        Return ONLY a valid JSON array or an object containing a 'clips' array with objects having: "title", "start" (number in seconds), "end" (number in seconds), and "viral_score" (1-100).
         
         Transcript:
         {transcript_text[:15000]}
@@ -112,6 +101,9 @@ async def generate_clips(req: VideoRequest):
         for idx, clip_info in enumerate(clips_data[:3]):
             start = float(clip_info["start"])
             duration = float(clip_info["end"]) - start
+            if duration <= 0:
+                duration = 30.0
+            
             out_name = f"clip_{idx+1}.mp4"
             out_path = os.path.join("clips", out_name)
 

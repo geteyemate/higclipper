@@ -2,5 +2,6 @@ fastapi
 uvicorn
 yt-dlp
 groq
+requests
 moviepy==1.0.3
 pydantic

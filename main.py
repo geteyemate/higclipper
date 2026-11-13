@@ -1,11 +1,9 @@
 import os
 import json
 import subprocess
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-import yt_dlp
 from groq import Groq
 
 app = FastAPI()
@@ -24,55 +22,34 @@ app.mount("/clips", StaticFiles(directory="clips"), name="clips")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 client = Groq(api_key=GROQ_API_KEY)
 
-class VideoRequest(BaseModel):
-    url: str
-
 @app.get("/")
 def home():
     return {"status": "HigClipper Backend is Live!"}
 
 @app.post("/generate-clips")
-async def generate_clips(req: VideoRequest):
+async def generate_clips(file: UploadFile = File(...)):
     try:
         video_path = "input.mp4"
         audio_path = "audio.mp3"
         
-        for f in [video_path, audio_path]:
-            if os.path.exists(f):
-                os.remove(f)
-
-        # 1. Bypass YouTube bot check using TV and iOS player clients
-        ydl_opts = {
-            'format': 'best[height<=720][ext=mp4]/best[ext=mp4]',
-            'outtmpl': video_path,
-            'overwrites': True,
-            'noplaylist': True,
-            'extractor_args': {
-                'youtube': {
-                    'player-client': ['tv', 'ios']
-                }
-            }
-        }
-
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([req.url])
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Download Error: {str(e)}")
+        # Save uploaded video file
+        with open(video_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
 
         if not os.path.exists(video_path) or os.path.getsize(video_path) == 0:
-            raise HTTPException(status_code=400, detail="Downloaded video file is empty or missing.")
+            raise HTTPException(status_code=400, detail="Uploaded video file is empty.")
 
-        # 2. Audio extract via FFmpeg
+        # 1. Audio extract via FFmpeg
         subprocess.run([
             "ffmpeg", "-y", "-i", video_path, "-vn", 
             "-acodec", "libmp3lame", "-q:a", "4", audio_path
         ], check=True)
 
-        # 3. Groq Whisper se Transcript
-        with open(audio_path, "rb") as file:
+        # 2. Groq Whisper se Transcript
+        with open(audio_path, "rb") as aud_file:
             transcription = client.audio.transcriptions.create(
-                file=(audio_path, file.read()),
+                file=(audio_path, aud_file.read()),
                 model="whisper-large-v3-turbo",
                 response_format="verbose_json",
             )
@@ -80,7 +57,7 @@ async def generate_clips(req: VideoRequest):
         segments = transcription.segments
         transcript_text = "\n".join([f"[{s['start']:.1f}s - {s['end']:.1f}s]: {s['text']}" for s in segments])
 
-        # 4. Groq Llama-3 se Viral Moments
+        # 3. Groq Llama-3 se Viral Moments
         prompt = f"""
         Analyze this video transcript with timestamps and find the top 3 most engaging, viral-worthy clips (each 20 to 50 seconds long).
         Return ONLY a valid JSON object containing a 'clips' array with objects having: "title", "start" (number in seconds), "end" (number in seconds), and "viral_score" (1-100).
@@ -100,7 +77,7 @@ async def generate_clips(req: VideoRequest):
 
         output_clips = []
 
-        # 5. FFmpeg se 9:16 Crop & Cut
+        # 4. FFmpeg se 9:16 Crop & Cut
         for idx, clip_info in enumerate(clips_data[:3]):
             start = float(clip_info["start"])
             duration = float(clip_info["end"]) - start
@@ -126,5 +103,6 @@ async def generate_clips(req: VideoRequest):
 
         return {"status": "success", "clips": output_clips}
 
+    עתe: # type: ignore
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

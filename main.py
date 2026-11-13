@@ -41,7 +41,7 @@ async def generate_clips(req: VideoRequest):
             if os.path.exists(f):
                 os.remove(f)
 
-        # 1. Advanced yt-dlp config using multi-client bypass
+        # 1. Bypass YouTube bot check using TV and iOS player clients
         ydl_opts = {
             'format': 'best[height<=720][ext=mp4]/best[ext=mp4]',
             'outtmpl': video_path,
@@ -49,7 +49,7 @@ async def generate_clips(req: VideoRequest):
             'noplaylist': True,
             'extractor_args': {
                 'youtube': {
-                    'player-client': ['mweb', 'android']
+                    'player-client': ['tv', 'ios']
                 }
             }
         }
@@ -58,7 +58,7 @@ async def generate_clips(req: VideoRequest):
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([req.url])
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"YT-DLP Error: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Download Error: {str(e)}")
 
         if not os.path.exists(video_path) or os.path.getsize(video_path) == 0:
             raise HTTPException(status_code=400, detail="Downloaded video file is empty or missing.")

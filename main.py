@@ -41,29 +41,40 @@ async def generate_clips(req: VideoRequest):
             if os.path.exists(f):
                 os.remove(f)
 
-        # 1. Fetch direct video stream via Cobalt API
+        # Extract YouTube video ID from URL
+        video_id = ""
+        if "youtu.be/" in req.url:
+            video_id = req.url.split("youtu.be/")[1].split("?")[0]
+        elif "watch?v=" in req.url:
+            video_id = req.url.split("watch?v=")[1].split("&")[0]
+
+        if not video_id:
+            raise HTTPException(status_code=400, detail="Invalid YouTube URL format.")
+
+        # Fetch video download link via Public Invidious API instances (No bot check)
         download_url = None
-        try:
-            headers = {
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-            }
-            res = requests.post(
-                "https://api.cobalt.tools/api/json",
-                json={"url": req.url, "videoQuality": "720"},
-                headers=headers,
-                timeout=15
-            )
-            
-            if res.status_code == 200 and res.text.strip():
-                data = res.json()
-                download_url = data.get("url") or (data.get("picker", [{}])[0].get("url") if data.get("picker") else None)
-        except Exception:
-            pass
+        invidious_instances = [
+            "https://vid.puffyan.us",
+            "https://invidious.privacyredirect.com",
+            "https://inv.nadeko.net"
+        ]
+
+        for instance in invidious_instances:
+            try:
+                res = requests.get(f"{instance}/api/v1/videos/{video_id}", timeout=10)
+                if res.status_code == 200:
+                    data = res.json()
+                    adaptive_formats = data.get("adaptiveFormats", [])
+                    # Find best mp4 video stream
+                    mp4_streams = [s for s in adaptive_formats if "video/mp4" in s.get("type", "") and s.get("url")]
+                    if mp4_streams:
+                        download_url = mp4_streams[0]["url"]
+                        break
+            except Exception:
+                continue
 
         if not download_url:
-            raise HTTPException(status_code=400, detail="Could not fetch direct video link via Cobalt API.")
+            raise HTTPException(status_code=400, detail="YouTube stream blocked on cloud server. Please try a different video.")
 
         # Download video stream safely
         vid_res = requests.get(download_url, stream=True, timeout=30)

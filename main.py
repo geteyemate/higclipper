@@ -103,6 +103,5 @@ async def generate_clips(file: UploadFile = File(...)):
 
         return {"status": "success", "clips": output_clips}
 
-    עתe: # type: ignore
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -9,7 +9,6 @@ export default function Home() {
   const [clips, setClips] = useState([]);
   const [error, setError] = useState("");
 
-  // 👇 YAHAN APNE RENDER WALA BACKEND URL DAL DENA (Bina aakhri slash '/' ke)
   const BACKEND_URL = "https://higclipper.onrender.com";
 
   const handleGenerate = async (e) => {
@@ -19,7 +18,7 @@ export default function Home() {
     setLoading(true);
     setError("");
     setClips([]);
-    setStatusText("Fetching video & analyzing viral moments with AI...");
+    setStatusText("Analyzing video structure & extracting key moments...");
 
     try {
       const res = await fetch(`${BACKEND_URL}/generate-clips`, {
@@ -37,7 +36,7 @@ export default function Home() {
       }
 
       setClips(data.clips);
-      setStatusText("Clips generated successfully!");
+      setStatusText("Clips generated successfully.");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -46,74 +45,86 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-neutral-950 text-white flex flex-col items-center px-4 py-12 selection:bg-purple-500 selection:text-white">
-      {/* Header */}
-      <div className="w-full max-w-3xl text-center mb-10">
-        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-purple-400 via-pink-500 to-red-500 bg-clip-text text-transparent mb-3">
-          HigClipper ⚡
+    <main className="min-h-screen bg-[#060608] text-neutral-100 flex flex-col items-center px-6 py-16 selection:bg-white selection:text-black font-sans">
+      
+      {/* Navigation / Brand Header */}
+      <nav className="w-full max-w-4xl flex items-center justify-between mb-16 border-b border-neutral-900 pb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-3 h-3 rounded-full bg-white animate-pulse"></div>
+          <span className="font-semibold tracking-wider text-sm uppercase text-neutral-300">HigClipper Studio</span>
+        </div>
+        <span className="text-xs text-neutral-500 font-mono">v1.0 Production</span>
+      </nav>
+
+      {/* Hero Section */}
+      <div className="w-full max-w-3xl text-center mb-12">
+        <h1 className="text-4xl sm:text-6xl font-medium tracking-tight text-white mb-4">
+          Motion intelligence for creators.
         </h1>
-        <p className="text-neutral-400 text-sm sm:text-base">
-          AI-powered automated viral video clipper for Shorts & Reels.
+        <p className="text-neutral-400 text-base sm:text-lg max-w-xl mx-auto font-light">
+          Transform long-form YouTube videos into high-retention 9:16 vertical shorts instantly using advanced AI models.
         </p>
       </div>
 
-      {/* Input Form Card */}
-      <div className="w-full max-w-2xl bg-neutral-900/80 border border-neutral-800 p-6 rounded-2xl shadow-2xl backdrop-blur-md">
-        <form onSubmit={handleGenerate} className="flex flex-col sm:flex-row gap-3">
+      {/* Input Console */}
+      <div className="w-full max-w-2xl bg-[#0c0c10] border border-neutral-800/80 p-3 rounded-2xl shadow-2xl backdrop-blur-xl mb-16">
+        <form onSubmit={handleGenerate} className="flex flex-col sm:flex-row gap-2">
           <input
             type="url"
-            placeholder="Paste YouTube Video URL (e.g., https://youtu.be/...)"
+            placeholder="Paste YouTube URL (https://youtube.com/...)"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             required
-            className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-3 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-purple-500 transition-colors"
+            className="flex-1 bg-[#121216] border border-neutral-800 rounded-xl px-4 py-3.5 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-neutral-500 transition-all font-mono"
           />
           <button
             type="submit"
             disabled={loading}
-            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:opacity-50 text-white font-medium px-6 py-3 rounded-xl transition-all duration-200 shadow-lg shadow-purple-900/20 cursor-pointer flex items-center justify-center"
+            className="bg-white hover:bg-neutral-200 disabled:opacity-40 text-black font-medium px-7 py-3.5 rounded-xl transition-all text-sm tracking-wide cursor-pointer flex items-center justify-center"
           >
             {loading ? "Processing..." : "Generate Clips"}
           </button>
         </form>
 
         {loading && (
-          <div className="mt-6 flex flex-col items-center justify-center space-y-3">
-            <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-xs text-purple-400 animate-pulse font-medium">{statusText}</p>
+          <div className="mt-6 py-4 flex flex-col items-center justify-center space-y-3 border-t border-neutral-900">
+            <div className="w-5 h-5 border-2 border-neutral-400 border-t-white rounded-full animate-spin"></div>
+            <p className="text-xs text-neutral-400 font-mono tracking-wide">{statusText}</p>
           </div>
         )}
 
         {error && (
-          <div className="mt-4 p-3 bg-red-950/50 border border-red-800 text-red-200 text-sm rounded-xl">
-            ⚠️ Error: {error}
+          <div className="mt-4 p-4 bg-red-950/30 border border-red-900/50 text-red-300 text-xs rounded-xl font-mono">
+            Error: {error}
           </div>
         )}
       </div>
 
       {/* Results Section */}
       {clips.length > 0 && (
-        <div className="w-full max-w-4xl mt-12">
-          <h2 className="text-xl font-bold mb-6 text-neutral-200 border-b border-neutral-800 pb-2">
-            🔥 Generated Viral Clips
-          </h2>
+        <div className="w-full max-w-5xl">
+          <div className="flex items-center justify-between mb-8 border-b border-neutral-900 pb-4">
+            <h2 className="text-sm font-medium uppercase tracking-widest text-neutral-400">
+              Generated Assets ({clips.length})
+            </h2>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {clips.map((clip, index) => (
               <div
                 key={index}
-                className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 flex flex-col justify-between shadow-xl hover:border-neutral-700 transition-all"
+                className="bg-[#0c0c10] border border-neutral-800/80 rounded-2xl p-5 flex flex-col justify-between shadow-lg hover:border-neutral-700 transition-all group"
               >
                 <div>
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-xs font-semibold px-2.5 py-1 bg-purple-950 text-purple-300 rounded-full border border-purple-800/50">
-                      Score: {clip.viral_score}/100
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-[10px] font-mono uppercase px-2.5 py-1 bg-neutral-900 text-neutral-300 rounded-full border border-neutral-800">
+                      Score: {clip.viral_score}
                     </span>
                   </div>
-                  <h3 className="font-semibold text-sm text-neutral-100 mb-4 line-clamp-2">
+                  <h3 className="font-normal text-sm text-neutral-200 mb-5 line-clamp-2 leading-relaxed">
                     {clip.title}
                   </h3>
                   {/* Vertical 9:16 Video Player Preview */}
-                  <div className="w-full aspect-[9/16] bg-black rounded-xl overflow-hidden mb-4 border border-neutral-800">
+                  <div className="w-full aspect-[9/16] bg-black rounded-xl overflow-hidden mb-5 border border-neutral-900 relative">
                     <video
                       controls
                       src={`${BACKEND_URL}${clip.url}`}
@@ -126,9 +137,9 @@ export default function Home() {
                   download
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-medium py-2.5 rounded-xl text-center transition-colors flex items-center justify-center gap-2"
+                  className="w-full bg-[#16161c] hover:bg-neutral-800 text-neutral-200 text-xs font-medium py-3 rounded-xl text-center transition-colors flex items-center justify-center gap-2 border border-neutral-800"
                 >
-                  ⬇️ Download MP4
+                  Download MP4
                 </a>
               </div>
             ))}

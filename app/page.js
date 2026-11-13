@@ -22,9 +22,7 @@ export default function Home() {
     formData.append("file", file);
 
     try {
-      // Yahan apna Render backend ka URL daal dena agar alag domain ho, 
-      // agar same domain/proxy hai toh relative URL bhi chalega.
-      const res = await fetch("https://YOUR-RENDER-BACKEND-URL.onrender.com/generate-clips", {
+      const res = await fetch("https://higclipper.onrender.com/generate-clips", {
         method: "POST",
         body: formData,
       });
@@ -74,7 +72,7 @@ export default function Home() {
             <div key={index} className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 flex flex-col gap-2">
               <h3 className="font-semibold">{clip.title}</h3>
               <p className="text-xs text-gray-400">Viral Score: {clip.viral_score}/100</p>
-              <video controls src={`https://YOUR-RENDER-BACKEND-URL.onrender.com${clip.url}`} className="w-full rounded-lg mt-2" />
+              <video controls src={`https://higclipper.onrender.com${clip.url}`} className="w-full rounded-lg mt-2" />
             </div>
           ))}
         </div>

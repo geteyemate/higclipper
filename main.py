@@ -41,29 +41,36 @@ async def generate_clips(req: VideoRequest):
             if os.path.exists(f):
                 os.remove(f)
 
-        # 1. Fetch direct video stream via Cobalt API (Bypasses YouTube datacenter bot block)
+        # 1. Fetch direct video stream via Cobalt API
+        download_url = None
         try:
-            cobalt_res = requests.post(
+            headers = {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+            }
+            res = requests.post(
                 "https://api.cobalt.tools/api/json",
                 json={"url": req.url, "videoQuality": "720"},
-                headers={"Accept": "application/json", "Content-Type": "application/json"},
+                headers=headers,
                 timeout=15
             )
-            data = cobalt_res.json()
             
-            download_url = data.get("url") or (data.get("picker", [{}])[0].get("url") if data.get("picker") else None)
-            
-            if not download_url:
-                raise HTTPException(status_code=400, detail="Could not extract stream URL from Cobalt.")
-            
-            vid_res = requests.get(download_url, stream=True, timeout=30)
-            with open(video_path, "wb") as f:
-                for chunk in vid_res.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-                        
-        except Exception as api_err:
-            raise HTTPException(status_code=400, detail=f"Download bypass failed: {str(api_err)}")
+            if res.status_code == 200 and res.text.strip():
+                data = res.json()
+                download_url = data.get("url") or (data.get("picker", [{}])[0].get("url") if data.get("picker") else None)
+        except Exception:
+            pass
+
+        if not download_url:
+            raise HTTPException(status_code=400, detail="Could not fetch direct video link via Cobalt API.")
+
+        # Download video stream safely
+        vid_res = requests.get(download_url, stream=True, timeout=30)
+        with open(video_path, "wb") as f:
+            for chunk in vid_res.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
 
         if not os.path.exists(video_path) or os.path.getsize(video_path) == 0:
             raise HTTPException(status_code=400, detail="Downloaded video file is empty.")

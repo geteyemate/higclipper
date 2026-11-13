@@ -1,11 +1,11 @@
 import os
 import json
 import subprocess
-import requests
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+import yt_dlp
 from groq import Groq
 
 app = FastAPI()
@@ -41,50 +41,27 @@ async def generate_clips(req: VideoRequest):
             if os.path.exists(f):
                 os.remove(f)
 
-        # Extract YouTube video ID from URL
-        video_id = ""
-        if "youtu.be/" in req.url:
-            video_id = req.url.split("youtu.be/")[1].split("?")[0]
-        elif "watch?v=" in req.url:
-            video_id = req.url.split("watch?v=")[1].split("&")[0]
+        # 1. Advanced yt-dlp config using multi-client bypass
+        ydl_opts = {
+            'format': 'best[height<=720][ext=mp4]/best[ext=mp4]',
+            'outtmpl': video_path,
+            'overwrites': True,
+            'noplaylist': True,
+            'extractor_args': {
+                'youtube': {
+                    'player-client': ['mweb', 'android']
+                }
+            }
+        }
 
-        if not video_id:
-            raise HTTPException(status_code=400, detail="Invalid YouTube URL format.")
-
-        # Fetch video download link via Public Invidious API instances (No bot check)
-        download_url = None
-        invidious_instances = [
-            "https://vid.puffyan.us",
-            "https://invidious.privacyredirect.com",
-            "https://inv.nadeko.net"
-        ]
-
-        for instance in invidious_instances:
-            try:
-                res = requests.get(f"{instance}/api/v1/videos/{video_id}", timeout=10)
-                if res.status_code == 200:
-                    data = res.json()
-                    adaptive_formats = data.get("adaptiveFormats", [])
-                    # Find best mp4 video stream
-                    mp4_streams = [s for s in adaptive_formats if "video/mp4" in s.get("type", "") and s.get("url")]
-                    if mp4_streams:
-                        download_url = mp4_streams[0]["url"]
-                        break
-            except Exception:
-                continue
-
-        if not download_url:
-            raise HTTPException(status_code=400, detail="YouTube stream blocked on cloud server. Please try a different video.")
-
-        # Download video stream safely
-        vid_res = requests.get(download_url, stream=True, timeout=30)
-        with open(video_path, "wb") as f:
-            for chunk in vid_res.iter_content(chunk_size=8192):
-                if chunk:
-                    f.write(chunk)
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([req.url])
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"YT-DLP Error: {str(e)}")
 
         if not os.path.exists(video_path) or os.path.getsize(video_path) == 0:
-            raise HTTPException(status_code=400, detail="Downloaded video file is empty.")
+            raise HTTPException(status_code=400, detail="Downloaded video file is empty or missing.")
 
         # 2. Audio extract via FFmpeg
         subprocess.run([

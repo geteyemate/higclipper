@@ -41,16 +41,22 @@ async def generate_clips(req: VideoRequest):
             if os.path.exists(f):
                 os.remove(f)
 
-        # 1. Video download with Android client bypass to prevent bot sign-in block
+        # 1. Advanced yt-dlp config with multiple fallback player clients and spoofing
         ydl_opts = {
             'format': 'best[height<=720][ext=mp4]/best[ext=mp4]',
             'outtmpl': video_path,
             'overwrites': True,
             'noplaylist': True,
+            'geo_bypass': True,
             'extractor_args': {
                 'youtube': {
-                    'player-client': ['android', 'web']
+                    'player-client': ['ios', 'android', 'web']
                 }
+            },
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
             }
         }
         

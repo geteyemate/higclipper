@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+yt-dlp
+groq
+moviepy==1.0.3
+pydantic
